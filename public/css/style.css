@@ -311,6 +311,17 @@ html[data-theme="dark"] .theme-icon-moon { opacity: 1; transform: translateY(0) 
   margin: 0 0 16px;
   font-weight: 600;
 }
+.panel-chart {
+  position: relative;
+  height: 340px;
+  display: flex;
+  flex-direction: column;
+}
+.panel-chart canvas {
+  flex: 1;
+  min-height: 0;
+  max-width: 100%;
+}
 
 /* Table */
 .panel-table { padding: 0; overflow: hidden; }
