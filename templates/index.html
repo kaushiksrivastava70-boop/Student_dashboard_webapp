@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="{{ theme }}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Student Performance Dashboard</title>
+<style>
+  :root{
+    --ink:#0B1E2D; --deep:#065A82; --teal:#1C7293; --mist:#F2F7FA;
+    --amber:#E8823C; --line:#D7E3EA; --muted:#5B6B78; --white:#FFFFFF;
+    --card-bg:#FFFFFF; --page-bg:#F2F7FA; --text:#0B1E2D;
+    --rail-bg:#0B1E2D; --rail-text:#FFFFFF; --rail-muted:#9FB8CC;
+    --input-bg:rgba(255,255,255,.06); --input-border:rgba(255,255,255,.14);
+    --hover-row:#FAFCFD; --shadow: none;
+  }
+  html[data-theme="dark"]{
+    --page-bg:#0E1620; --card-bg:#161F2B; --text:#E7EEF3; --muted:#93A4B2;
+    --line:#26313D; --rail-bg:#0A1119; --rail-text:#E7EEF3; --rail-muted:#7E93A3;
+    --input-bg:rgba(255,255,255,.04); --input-border:rgba(255,255,255,.1);
+    --hover-row:#1B2531; --white:#161F2B; --shadow: 0 0 0 1px rgba(255,255,255,.02);
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--page-bg); color:var(--text); transition:background .2s ease, color .2s ease;}
+  .app{display:grid; grid-template-columns:360px 1fr; min-height:100vh;}
+  @media (max-width:900px){ .app{grid-template-columns:1fr;} }
+
+  .rail{background:var(--rail-bg); color:var(--rail-text); padding:2rem 1.75rem; position:relative; overflow:hidden;}
+  .rail::before{content:""; position:absolute; top:-120px; right:-140px; width:320px; height:320px;
+    border-radius:50%; background:radial-gradient(circle at 30% 30%, var(--teal), transparent 70%);
+    opacity:.35; pointer-events:none;}
+  .rail-top{display:flex; justify-content:space-between; align-items:flex-start; position:relative;}
+  .brand{font-family:Cambria,Georgia,serif; font-weight:700; font-size:1.5rem; line-height:1.2;}
+  .brand-sub{font-size:.8rem; color:var(--rail-muted); margin-bottom:2rem; position:relative;}
+
+  .theme-toggle{display:flex; align-items:center; gap:.4rem; background:rgba(255,255,255,.08);
+    border:1px solid rgba(255,255,255,.16); border-radius:999px; padding:.3rem; flex-shrink:0;}
+  .theme-toggle button{border:none; background:transparent; color:var(--rail-muted); cursor:pointer;
+    padding:.35rem .6rem; border-radius:999px; font-size:.85rem; line-height:1; display:flex; align-items:center;}
+  .theme-toggle button.active{background:var(--teal); color:#fff;}
+
+  .rail h2{font-size:.7rem; text-transform:uppercase; letter-spacing:1.2px; color:#77C6E8;
+    margin-bottom:1rem; margin-top:1.6rem; font-weight:600; position:relative;}
+  .rail h2:first-of-type{margin-top:0;}
+  .field{margin-bottom:1rem; position:relative;}
+  .field label{display:block; font-size:.72rem; color:var(--rail-muted); margin-bottom:.35rem;
+    text-transform:uppercase; letter-spacing:.6px;}
+  .field input{width:100%; padding:.6rem .7rem; border-radius:8px; border:1px solid var(--input-border);
+    background:var(--input-bg); color:var(--rail-text); font-size:.92rem; outline:none;}
+  .field input:focus{border-color:var(--teal); background:rgba(255,255,255,.1);}
+  .row3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:.7rem;}
+  .btn{width:100%; padding:.75rem 1rem; border-radius:8px; border:none; font-size:.88rem;
+    font-weight:600; cursor:pointer;}
+  .btn-primary{background:var(--teal); color:#fff; margin-top:.25rem;}
+  .btn-primary:hover{filter:brightness(1.1);}
+  .btn-ghost{background:transparent; color:var(--rail-muted); border:1px solid rgba(255,255,255,.16);
+    margin-top:.6rem; font-weight:500;}
+  .btn-ghost:hover{background:rgba(255,255,255,.06); color:var(--rail-text);}
+  .rail-footer{margin-top:2.2rem; padding-top:1.2rem; border-top:1px solid rgba(255,255,255,.1);
+    font-size:.72rem; color:#5F7688; position:relative;}
+  .rail-footer b{color:var(--rail-muted);}
+
+  /* CSV upload box */
+  .upload-box{border:1px dashed rgba(255,255,255,.22); border-radius:10px; padding:.9rem; margin-bottom:.7rem;}
+  .upload-box input[type=file]{width:100%; font-size:.78rem; color:var(--rail-muted); margin-bottom:.7rem;}
+  .upload-box input[type=file]::file-selector-button{
+    background:var(--teal); color:#fff; border:none; padding:.4rem .7rem; border-radius:6px;
+    font-size:.78rem; cursor:pointer; margin-right:.6rem;}
+  .radio-row{display:flex; gap:1rem; margin-bottom:.7rem; font-size:.78rem; color:var(--rail-muted);}
+  .radio-row label{display:flex; align-items:center; gap:.35rem; cursor:pointer; text-transform:none; letter-spacing:0;}
+  .radio-row input{width:auto;}
+  .sample-link{display:block; text-align:center; font-size:.76rem; color:#77C6E8; text-decoration:none;
+    margin-top:.6rem;}
+  .sample-link:hover{text-decoration:underline;}
+
+  .main{padding:2.25rem 2.5rem 3rem; max-width:1400px;}
+  @media (max-width:640px){ .main{padding:1.5rem 1.1rem 2.5rem;} .rail{padding:1.75rem 1.25rem;} }
+  .main-head h1{font-family:Cambria,Georgia,serif; font-size:1.9rem; font-weight:700;}
+  .main-head p{color:var(--muted); font-size:.92rem; margin-top:.25rem; margin-bottom:1.75rem;}
+
+  .flash-stack{margin-bottom:1.25rem; display:flex; flex-direction:column; gap:.5rem;}
+  .flash{padding:.7rem 1rem; border-radius:8px; font-size:.85rem; border:1px solid transparent;}
+  .flash-success{background:rgba(47,191,113,.12); color:#1C8F55; border-color:rgba(47,191,113,.3);}
+  .flash-error{background:rgba(217,83,79,.1); color:#C0392B; border-color:rgba(217,83,79,.3);}
+  .flash-warning{background:rgba(232,178,60,.14); color:#93701C; border-color:rgba(232,178,60,.35);}
+  html[data-theme="dark"] .flash-success{color:#4CD98A;}
+  html[data-theme="dark"] .flash-error{color:#F08E8B;}
+  html[data-theme="dark"] .flash-warning{color:#F0CE7A;}
+
+  .stats{display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; margin-bottom:1.75rem;}
+  @media (max-width:900px){ .stats{grid-template-columns:repeat(2,1fr);} }
+  .stat{background:var(--card-bg); border:1px solid var(--line); border-radius:12px; padding:1.1rem 1.25rem; box-shadow:var(--shadow);}
+  .stat .label{font-size:.7rem; text-transform:uppercase; letter-spacing:.8px; color:var(--muted);
+    margin-bottom:.4rem; font-weight:600;}
+  .stat .value{font-size:1.9rem; font-weight:700; font-variant-numeric:tabular-nums;}
+  .stat .value span{font-size:1rem; color:var(--muted); font-weight:500;}
+
+  .charts{display:grid; grid-template-columns:1fr 1fr; gap:1.1rem; margin-bottom:1.9rem;}
+  @media (max-width:900px){ .charts{grid-template-columns:1fr;} }
+  .chart-card{background:var(--card-bg); border:1px solid var(--line); border-radius:12px;
+    padding:1rem; text-align:center; box-shadow:var(--shadow);}
+  .chart-card img{max-width:100%; height:auto; display:block; margin:0 auto;}
+
+  .table-card{background:var(--card-bg); border:1px solid var(--line); border-radius:12px; overflow:hidden; box-shadow:var(--shadow);}
+  .table-head{display:flex; justify-content:space-between; align-items:center; padding:1rem 1.25rem;
+    border-bottom:1px solid var(--line);}
+  .table-head h3{font-size:.95rem; font-weight:700;}
+  .table-head span{font-size:.78rem; color:var(--muted);}
+  table{width:100%; border-collapse:collapse; font-size:.86rem;}
+  thead th{text-align:left; padding:.7rem 1.1rem; font-size:.7rem; text-transform:uppercase;
+    letter-spacing:.6px; color:var(--muted); background:var(--page-bg); white-space:nowrap;}
+  tbody td{padding:.65rem 1.1rem; border-top:1px solid var(--line); font-variant-numeric:tabular-nums;}
+  tbody tr:hover{background:var(--hover-row);}
+  .name-cell{font-weight:600;}
+  .grade-badge{display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px;
+    border-radius:50%; font-size:.78rem; font-weight:700; color:#fff; border:2px solid rgba(255,255,255,.5);}
+  .del-btn{background:none; border:none; cursor:pointer; color:var(--muted); font-size:1.05rem; line-height:1;
+    padding:.2rem .4rem; border-radius:6px;}
+  .del-btn:hover{color:#D9534F; background:rgba(217,83,79,.1);}
+  .empty{padding:3rem 1.25rem; text-align:center; color:var(--muted); font-size:.9rem;}
+  .footer-note{margin-top:1.5rem; font-size:.76rem; color:var(--muted); text-align:center;}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <aside class="rail">
+    <div class="rail-top">
+      <div>
+        <div class="brand">Student Performance<br>Dashboard</div>
+        <div class="brand-sub">Python + Pandas + NumPy + Matplotlib</div>
+      </div>
+      <form method="POST" action="{{ url_for('set_theme', mode='light') }}" style="display:contents;">
+      </form>
+      <div class="theme-toggle">
+        <form method="POST" action="{{ url_for('set_theme', mode='light') }}">
+          <button type="submit" class="{{ 'active' if theme == 'light' else '' }}" title="Light mode">☀</button>
+        </form>
+        <form method="POST" action="{{ url_for('set_theme', mode='dark') }}">
+          <button type="submit" class="{{ 'active' if theme == 'dark' else '' }}" title="Dark mode">☾</button>
+        </form>
+      </div>
+    </div>
+
+    <h2>Add Student</h2>
+    <form method="POST" action="{{ url_for('add_student') }}">
+      <div class="field">
+        <label for="f-name">Name</label>
+        <input id="f-name" name="name" type="text" placeholder="e.g. Aman" required>
+      </div>
+      <div class="row3">
+        <div class="field">
+          <label for="f-math">Math</label>
+          <input id="f-math" name="math" type="number" min="0" max="100" required>
+        </div>
+        <div class="field">
+          <label for="f-sci">Science</label>
+          <input id="f-sci" name="science" type="number" min="0" max="100" required>
+        </div>
+        <div class="field">
+          <label for="f-eng">English</label>
+          <input id="f-eng" name="english" type="number" min="0" max="100" required>
+        </div>
+      </div>
+      <div class="field">
+        <label for="f-att">Attendance (%)</label>
+        <input id="f-att" name="attendance" type="number" min="0" max="100" required>
+      </div>
+      <button type="submit" class="btn btn-primary">+ Add Student</button>
+    </form>
+
+    <h2>Upload CSV</h2>
+    <form method="POST" action="{{ url_for('upload_csv') }}" enctype="multipart/form-data">
+      <div class="upload-box">
+        <input type="file" name="csv_file" accept=".csv" required>
+        <div class="radio-row">
+          <label><input type="radio" name="upload_mode" value="replace" checked> Replace all</label>
+          <label><input type="radio" name="upload_mode" value="append"> Add to existing</label>
+        </div>
+        <button type="submit" class="btn btn-primary" style="margin-top:0;">⇧ Upload CSV</button>
+      </div>
+    </form>
+    <a class="sample-link" href="{{ url_for('sample_csv') }}" download>⬇ Download sample CSV template</a>
+
+    <h2>Data</h2>
+    <form method="POST" action="{{ url_for('reset_data') }}">
+      <button type="submit" class="btn btn-ghost">Reset to Sample Data</button>
+    </form>
+    <form method="POST" action="{{ url_for('clear_data') }}">
+      <button type="submit" class="btn btn-ghost">Clear All</button>
+    </form>
+
+    <div class="rail-footer">
+      Total = Math + Science + English<br>
+      Average = Total ÷ 3 (NumPy mean)<br>
+      Grade: <b>A+</b> ≥90 · <b>A</b> ≥80 · <b>B</b> ≥70 · <b>C</b> ≥60 · <b>D</b> &lt;60<br><br>
+      CSV columns required: <b>Student, Math, Science, English, Attendance</b>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="main-head">
+      <h1>Class Overview</h1>
+      <p>Rendered server-side with Flask — data via Pandas, math via NumPy, charts via Matplotlib.</p>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+      <div class="flash-stack">
+        {% for category, message in messages %}
+          <div class="flash flash-{{ category }}">{{ message }}</div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    {% endwith %}
+
+    <section class="stats">
+      <div class="stat">
+        <div class="label">Students</div>
+        <div class="value">{{ stats.count }}</div>
+      </div>
+      <div class="stat">
+        <div class="label">Class Average</div>
+        <div class="value">{{ stats.avg }} <span>/ 100</span></div>
+      </div>
+      <div class="stat">
+        <div class="label">Top Score</div>
+        <div class="value">{{ stats.top }}</div>
+      </div>
+      <div class="stat">
+        <div class="label">Avg Attendance</div>
+        <div class="value">{{ stats.attendance | int }}% <span>class</span></div>
+      </div>
+    </section>
+
+    {% if charts %}
+    <section class="charts">
+      <div class="chart-card"><img src="data:image/png;base64,{{ charts.subject_avg }}" alt="Subject-wise average marks"></div>
+      <div class="chart-card"><img src="data:image/png;base64,{{ charts.top5 }}" alt="Top 5 students by total marks"></div>
+      <div class="chart-card"><img src="data:image/png;base64,{{ charts.grade_dist }}" alt="Grade distribution"></div>
+      <div class="chart-card"><img src="data:image/png;base64,{{ charts.scatter }}" alt="Attendance vs average marks"></div>
+    </section>
+    {% endif %}
+
+    <section class="table-card">
+      <div class="table-head">
+        <h3>Student Records</h3>
+        <span>{{ table|length }} student{{ 's' if table|length != 1 else '' }}</span>
+      </div>
+      {% if table %}
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th><th>Math</th><th>Science</th><th>English</th>
+              <th>Attendance</th><th>Total</th><th>Average</th><th>Grade</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in table %}
+            <tr>
+              <td class="name-cell">{{ row.Student }}</td>
+              <td>{{ row.Math }}</td>
+              <td>{{ row.Science }}</td>
+              <td>{{ row.English }}</td>
+              <td>{{ row.Attendance }}%</td>
+              <td>{{ row.Total | int }}</td>
+              <td>{{ row.Average }}</td>
+              <td><span class="grade-badge" style="background:{{ grade_colors[row.Grade] }}">{{ row.Grade }}</span></td>
+              <td>
+                <form method="POST" action="{{ url_for('delete_student', index=loop.index0) }}" style="display:inline;">
+                  <button type="submit" class="del-btn" title="Remove {{ row.Student }}">✕</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty">No students yet — add one on the left, upload a CSV, or reset to load sample data.</div>
+      {% endif %}
+    </section>
+
+    <p class="footer-note">Flask backend · NumPy for calculations · Pandas for the DataFrame · Matplotlib for charts</p>
+  </main>
+
+</div>
+</body>
+</html>
