@@ -78,13 +78,22 @@
           <div class="panel-head">
             <h3>Average vs. highest, by subject</h3>
           </div>
-          <canvas id="subjectChart" height="260"></canvas>
+          <img id="barChartImg" class="chart-img" alt="Bar chart: average vs. highest marks by subject" />
         </div>
         <div class="panel panel-chart">
           <div class="panel-head">
             <h3>Score distribution</h3>
           </div>
-          <canvas id="distributionChart" height="260"></canvas>
+          <img id="pieChartImg" class="chart-img" alt="Pie chart: score distribution" />
+        </div>
+      </div>
+
+      <div class="chart-grid chart-grid-single">
+        <div class="panel panel-chart">
+          <div class="panel-head">
+            <h3>Overall average per student</h3>
+          </div>
+          <img id="lineChartImg" class="chart-img" alt="Line chart: overall average per student" />
         </div>
       </div>
 
@@ -117,7 +126,6 @@
     <p>Gradeline — Python · Flask · Pandas · Chart.js</p>
   </footer>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
   <script src="/js/main.js"></script>
 </body>
 </html>
