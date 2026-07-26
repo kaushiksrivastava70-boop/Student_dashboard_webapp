@@ -11,7 +11,8 @@ Any non-numeric column other than a name/id column is ignored.
 """
 
 import io
-import re
+import logging
+import traceback
 
 import pandas as pd
 from flask import Flask, jsonify, render_template, request
@@ -23,7 +24,33 @@ from flask import Flask, jsonify, render_template, request
 app = Flask(__name__, static_folder="public", static_url_path="")
 
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024  # 5 MB guardrail
+app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_BYTES + (1024 * 1024)  # small buffer for form overhead
+
 NAME_COLUMN_CANDIDATES = {"name", "student", "student_name", "student name", "id"}
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("gradeline")
+
+
+# ---------------------------------------------------------------------------
+# Global error handlers: whatever goes wrong, the client always gets JSON
+# back (not an HTML error page), and the real error is printed to the
+# server logs (visible in Vercel's "Runtime Logs" tab for this project).
+# ---------------------------------------------------------------------------
+@app.errorhandler(413)
+def handle_too_large(_exc):
+    return jsonify({"error": "File is too large (5 MB limit)."}), 413
+
+
+@app.errorhandler(404)
+def handle_not_found(_exc):
+    return jsonify({"error": "Not found."}), 404
+
+
+@app.errorhandler(Exception)
+def handle_any_error(exc):
+    logger.error("Unhandled error: %s\n%s", exc, traceback.format_exc())
+    return jsonify({"error": f"Server error: {exc}"}), 500
 
 
 def _find_name_column(columns):
@@ -99,15 +126,29 @@ def compute_dashboard_payload(df: pd.DataFrame) -> dict:
     top_row = df.loc[df["__overall__"].idxmax()] if len(overall) else None
     top_performer = None
     if top_row is not None:
+        if name_col:
+            top_name = str(top_row[name_col])
+        else:
+            try:
+                top_name = f"Student {int(top_row.name) + 1}"
+            except (TypeError, ValueError):
+                top_name = "Top student"
         top_performer = {
-            "name": str(top_row[name_col]) if name_col else f"Student {int(top_row.name) + 1}",
+            "name": top_name,
             "average": round(float(top_row["__overall__"]), 2),
         }
 
-    # Full table for the data grid — replace NaN with None for valid JSON
+    # Full table for the data grid — replace NaN with None for valid JSON.
+    # We always expose the name/id field under the literal key "Name" so the
+    # frontend can rely on a stable key regardless of the original CSV
+    # header's exact spelling, casing, or whitespace.
     table_cols = ([name_col] if name_col else []) + subject_cols
-    table = df[table_cols].where(pd.notnull(df[table_cols]), None).to_dict(orient="records")
-    if not name_col:
+    table_df = df[table_cols].where(pd.notnull(df[table_cols]), None)
+    table = table_df.to_dict(orient="records")
+    if name_col:
+        for row in table:
+            row["Name"] = row.pop(name_col)
+    else:
         for i, row in enumerate(table):
             row["Name"] = f"Student {i + 1}"
 
@@ -123,7 +164,7 @@ def compute_dashboard_payload(df: pd.DataFrame) -> dict:
         "subjects": subjects,
         "distribution": distribution,
         "table": table,
-        "table_columns": (["Name"] if not name_col else [name_col]) + subject_cols,
+        "table_columns": ["Name"] + subject_cols,
     }
 
 
@@ -134,34 +175,39 @@ def index():
 
 @app.route("/upload", methods=["POST"])
 def upload():
-    if "file" not in request.files:
-        return jsonify({"error": "No file part in the request."}), 400
-
-    file = request.files["file"]
-    if file.filename == "":
-        return jsonify({"error": "No file selected."}), 400
-
-    if not file.filename.lower().endswith(".csv"):
-        return jsonify({"error": "Please upload a .csv file."}), 400
-
-    raw = file.read(MAX_UPLOAD_BYTES + 1)
-    if len(raw) > MAX_UPLOAD_BYTES:
-        return jsonify({"error": "File is too large (5 MB limit)."}), 400
-
     try:
-        df = pd.read_csv(io.BytesIO(raw))
-    except Exception as exc:  # noqa: BLE001
-        return jsonify({"error": f"Could not parse CSV: {exc}"}), 400
+        if "file" not in request.files:
+            return jsonify({"error": "No file part in the request."}), 400
 
-    if df.empty:
-        return jsonify({"error": "The uploaded CSV has no rows."}), 400
+        file = request.files["file"]
+        if file.filename == "":
+            return jsonify({"error": "No file selected."}), 400
 
-    try:
-        payload = compute_dashboard_payload(df)
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
+        if not file.filename.lower().endswith(".csv"):
+            return jsonify({"error": "Please upload a .csv file."}), 400
 
-    return jsonify(payload)
+        raw = file.read(MAX_UPLOAD_BYTES + 1)
+        logger.info("Received upload: %s (%d bytes)", file.filename, len(raw))
+        if len(raw) > MAX_UPLOAD_BYTES:
+            return jsonify({"error": "File is too large (5 MB limit)."}), 400
+
+        try:
+            df = pd.read_csv(io.BytesIO(raw))
+        except Exception as exc:  # noqa: BLE001
+            return jsonify({"error": f"Could not parse CSV: {exc}"}), 400
+
+        if df.empty:
+            return jsonify({"error": "The uploaded CSV has no rows."}), 400
+
+        try:
+            payload = compute_dashboard_payload(df)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+
+        return jsonify(payload)
+    except Exception as exc:  # noqa: BLE001 — last-resort safety net
+        logger.error("Upload failed: %s\n%s", exc, traceback.format_exc())
+        return jsonify({"error": f"Server error while processing the file: {exc}"}), 500
 
 
 if __name__ == "__main__":
