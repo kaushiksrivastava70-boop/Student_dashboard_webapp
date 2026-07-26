@@ -54,10 +54,18 @@ fileInput.addEventListener("change", () => {
 sampleBtn.addEventListener("click", async (e) => {
   e.stopPropagation();
   showError(null);
-  const res = await fetch("/sample_students.csv");
-  const blob = await res.blob();
-  const file = new File([blob], "sample_students.csv", { type: "text/csv" });
-  uploadFile(file);
+  try {
+    const res = await fetch("/sample_students.csv");
+    if (!res.ok) {
+      showError(`Could not load sample data (HTTP ${res.status}).`);
+      return;
+    }
+    const blob = await res.blob();
+    const file = new File([blob], "sample_students.csv", { type: "text/csv" });
+    uploadFile(file);
+  } catch (err) {
+    showError("Could not load sample data. Check your connection and try again.");
+  }
 });
 resetBtn.addEventListener("click", () => {
   dashboard.hidden = true;
@@ -88,17 +96,33 @@ async function uploadFile(file) {
   const formData = new FormData();
   formData.append("file", file);
 
+  let res;
   try {
-    const res = await fetch("/upload", { method: "POST", body: formData });
-    const data = await res.json();
-    if (!res.ok) {
-      showError(data.error || "Something went wrong processing that file.");
-      return;
-    }
-    renderDashboard(data);
-  } catch (err) {
-    showError("Could not reach the server. Please try again.");
+    res = await fetch("/upload", { method: "POST", body: formData });
+  } catch (networkErr) {
+    showError("Could not reach the server. Check your connection and try again.");
+    return;
   }
+
+  const rawText = await res.text();
+  let data;
+  try {
+    data = JSON.parse(rawText);
+  } catch (parseErr) {
+    // Server returned something that isn't JSON (e.g. a platform error page).
+    showError(
+      `Server returned an unexpected response (HTTP ${res.status}). ` +
+        "Check the server logs for details."
+    );
+    return;
+  }
+
+  if (!res.ok) {
+    showError(data.error || `Something went wrong (HTTP ${res.status}).`);
+    return;
+  }
+
+  renderDashboard(data);
 }
 
 function renderDashboard(data) {
@@ -172,6 +196,7 @@ function renderSubjectChart(subjects) {
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       plugins: {
         legend: {
           position: "bottom",
@@ -215,6 +240,7 @@ function renderDistributionChart(distribution) {
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       plugins: {
         legend: {
           position: "bottom",
